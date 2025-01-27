@@ -1,0 +1,18 @@
+[package]
+name = "skibidi_http"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.80"
+
+[lib]
+name = "skibidi_http"
+path = "src/lib.rs"
+
+[dependencies]
+anyhow = "1.0.68"                                # error handling
+async-trait = "0.1.85"
+bytes = "1.3.0"                                  # helps manage buffers
+clap = { version = "4.5.27", features = ["derive"] }
+memchr = "2.7.4"
+thiserror = "1.0.38"                             # error handling
+tokio = { version = "1.43.0", features = ["full"] }

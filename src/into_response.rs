@@ -85,7 +85,7 @@ impl Response {
         }
     }
 
-    fn error() -> Self {
+    pub fn error() -> Self {
         Self {
             // statuscode needs default and here we set the default to OK
             status_code: StatusCode::NOT_FOUND,
@@ -230,6 +230,48 @@ where
         params: HashMap<String, String>,
     ) -> Result<Response, HandlerError> {
         Ok((self)(request, params).into_response())
+    }
+}
+
+pub trait Handler0: Send + Sync + 'static {
+    fn call(&self) -> Result<Response, HandlerError>;
+}
+
+impl<F, R> Handler0 for F
+where
+    F: Fn() -> R + Send + Sync + 'static,
+    R: IntoResponse,
+{
+    fn call(&self) -> Result<Response, HandlerError> {
+        Ok((self)().into_response())
+    }
+}
+
+pub trait HandlerParams: Send + Sync + 'static {
+    fn call(&self, params: HashMap<String, String>) -> Result<Response, HandlerError>;
+}
+
+impl<F, R> HandlerParams for F
+where
+    F: Fn(HashMap<String, String>) -> R + Send + Sync + 'static,
+    R: IntoResponse,
+{
+    fn call(&self, params: HashMap<String, String>) -> Result<Response, HandlerError> {
+        Ok((self)(params).into_response())
+    }
+}
+
+pub trait HandlerRequest: Send + Sync + 'static {
+    fn call(&self, request: &Request) -> Result<Response, HandlerError>;
+}
+
+impl<F, R> HandlerRequest for F
+where
+    F: Fn(&Request) -> R + Send + Sync + 'static,
+    R: IntoResponse,
+{
+    fn call(&self, request: &Request) -> Result<Response, HandlerError> {
+        Ok((self)(request).into_response())
     }
 }
 

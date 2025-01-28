@@ -1,4 +1,8 @@
 pub mod client;
+use client::client::Request;
+use into_response::Handler0;
+use into_response::HandlerParams;
+use into_response::HandlerRequest;
 use std::io::{self, Write};
 use tokio::io::AsyncWriteExt;
 pub mod into_response;
@@ -15,11 +19,36 @@ use thiserror::Error;
 use tokio::runtime::Builder;
 
 pub struct RouterBuilder {
-    routes: Vec<(&'static str, Box<dyn Handler + Send + Sync>)>,
+    routes: Vec<(&'static str, HandlerTypes)>,
 }
 
 pub struct Router {
-    inner: Vec<(&'static str, Box<dyn Handler + Send + Sync>)>,
+    inner: Vec<(&'static str, HandlerTypes)>,
+}
+
+pub enum HandlerTypes {
+    ZeroParams(Box<dyn Handler0 + Send + Sync + 'static>),
+    Full(Box<dyn Handler + Send + Sync + 'static>),
+    Body(Box<dyn HandlerRequest + Send + Sync + 'static>),
+    Params(Box<dyn HandlerParams + Send + Sync + 'static>),
+}
+
+impl HandlerTypes {
+    pub fn full<F, R>(handler: F) -> Self
+    where
+        F: Fn(&Request, HashMap<String, String>) -> R + Send + Sync + 'static,
+        R: IntoResponse,
+    {
+        HandlerTypes::Full(Box::new(handler))
+    }
+
+    pub fn zero_params<F, R>(handler: F) -> Self
+    where
+        F: Fn() -> R + Send + Sync + 'static,
+        R: IntoResponse,
+    {
+        HandlerTypes::ZeroParams(Box::new(handler))
+    }
 }
 
 #[derive(Clone)]
@@ -28,7 +57,7 @@ pub struct RouterService {
 }
 
 pub struct RouteMatch<'a> {
-    pub handler: &'a Box<dyn Handler + Send + Sync>,
+    pub handler: &'a HandlerTypes,
     pub params: HashMap<String, String>,
 }
 
@@ -48,6 +77,16 @@ pub enum RouterError {
     PathNotFound,
 }
 
+pub trait Methodable: Send + Sync + 'static {
+    fn wrap(&self, handler: HandlerTypes) -> Box<HandlerTypes>;
+}
+
+pub fn get(
+    func: impl IntoResponse + Sync + Send + 'static,
+) -> Box<dyn IntoResponse + Sync + Send + 'static> {
+    Box::new(func)
+}
+
 type Route = (&'static str, Box<dyn Handler>);
 type HandlerType = Box<dyn Handler + Send + Sync>;
 
@@ -56,7 +95,7 @@ impl RouterBuilder {
         Self { routes: Vec::new() }
     }
 
-    pub fn route(mut self, path: &'static str, handler: HandlerType) -> Self {
+    pub fn route(mut self, path: &'static str, handler: HandlerTypes) -> Self {
         self.routes.push((path, handler));
         self
     }

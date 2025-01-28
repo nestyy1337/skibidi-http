@@ -1,7 +1,10 @@
 use crate::client::parse::parse_http;
 use crate::client::parse::parse_http_blocking;
+use crate::into_response::Response;
 use crate::write_async;
 use crate::write_blocking;
+use crate::HandlerTypes;
+use crate::IntoResponse;
 use crate::RouterService;
 use std::net::TcpStream;
 
@@ -11,11 +14,17 @@ pub fn handle_connection_blocking(mut stream: TcpStream, service: RouterService)
             Ok(request) => {
                 match service.router.matches(request.get_path()) {
                     Some(route_match) => {
-                        let resp = route_match
-                            .handler
-                            .call(&request, route_match.params)
-                            .unwrap()
-                            .to_bytes();
+                        let resp = match &route_match.handler {
+                            HandlerTypes::ZeroParams(a) => a.call().unwrap().to_bytes(),
+                            HandlerTypes::Full(b) => {
+                                b.call(&request, route_match.params).unwrap().to_bytes()
+                            }
+                            _ => Response::error().into_response().to_bytes(),
+                        };
+
+                        // .call(&request, route_match.params)
+                        // .unwrap()
+                        // .to_bytes();
 
                         println!("responding: {:?}", String::from_utf8_lossy(&resp));
                         if let Err(e) = write_blocking(&mut stream, &resp) {
@@ -50,13 +59,11 @@ pub async fn handle_connection(mut stream: tokio::net::TcpStream, service: Route
             Ok(request) => {
                 match service.router.matches(request.get_path()) {
                     Some(route_match) => {
-                        let resp = route_match
-                            .handler
-                            .call(&request, route_match.params)
-                            .unwrap()
-                            .to_bytes();
+                        let resp = match &route_match.handler {
+                            HandlerTypes::ZeroParams(a) => a.call().unwrap().to_bytes(),
+                            _ => Response::error().into_response().to_bytes(),
+                        };
 
-                        println!("responding: {:?}", String::from_utf8_lossy(&resp));
                         if let Err(e) = write_async(&mut stream, &resp).await {
                             eprintln!("ERRORED WITH: {:?}", e);
                             break;

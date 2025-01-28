@@ -125,17 +125,23 @@ impl Response {
 }
 
 pub trait IntoResponse {
-    fn into_response(&self) -> Response;
+    fn into_response(self) -> Response;
+}
+
+impl IntoResponse for Response {
+    fn into_response(self) -> Response {
+        self
+    }
 }
 
 impl IntoResponse for () {
-    fn into_response(&self) -> Response {
+    fn into_response(self) -> Response {
         Response::new()
     }
 }
 
 impl IntoResponse for String {
-    fn into_response(&self) -> Response {
+    fn into_response(self) -> Response {
         let mut resp = Response::new_with_file(self.to_string().into());
         resp.add_core_header("Content-Type".to_string(), "text/plain".to_string());
         resp
@@ -143,7 +149,7 @@ impl IntoResponse for String {
 }
 
 impl IntoResponse for &str {
-    fn into_response(&self) -> Response {
+    fn into_response(self) -> Response {
         let mut resp = Response::new_with_file(self.to_string().into());
         resp.add_core_header("Content-Type".to_string(), "text/plain".to_string());
         resp
@@ -154,7 +160,7 @@ impl<T> IntoResponse for (StatusCode, T)
 where
     T: IntoResponse,
 {
-    fn into_response(&self) -> Response {
+    fn into_response(self) -> Response {
         let (status, body) = self;
         let mut response = body.into_response();
         response.status_code = status.clone();
@@ -163,7 +169,7 @@ where
 }
 
 impl IntoResponse for StatusCode {
-    fn into_response(&self) -> Response {
+    fn into_response(self) -> Response {
         match self {
             StatusCode::NOT_FOUND => "404 Not Found".into_response(),
             StatusCode::CREATED => "201 Created".into_response(),
@@ -173,13 +179,29 @@ impl IntoResponse for StatusCode {
 }
 
 impl IntoResponse for Vec<u8> {
-    fn into_response(&self) -> Response {
-        let mut resp = Response::new_with_file(self.clone());
+    fn into_response(self) -> Response {
+        let mut resp = Response::new_with_file(self);
         resp.add_core_header(
             "Content-Type".to_string(),
             "application/octet-stream".to_string(),
         );
         resp
+    }
+}
+
+impl IntoResponse for HandlerError {
+    fn into_response(self) -> Response {
+        let response = Response::error();
+        response
+    }
+}
+
+impl IntoResponse for Result<Response, HandlerError> {
+    fn into_response(self) -> Response {
+        match self {
+            Ok(fine) => fine.into_response(),
+            Err(err) => err.into_response(),
+        }
     }
 }
 
@@ -189,24 +211,25 @@ pub enum HandlerError {
     MainHandlerError,
 }
 
-pub trait Handler {
-    fn handle(
+pub trait Handler: Send + Sync + 'static {
+    fn call(
         &self,
-        request: &Request,
+        req: &Request,
         params: HashMap<String, String>,
     ) -> Result<Response, HandlerError>;
 }
 
-impl<F> Handler for F
+impl<F, R> Handler for F
 where
-    F: Fn(&Request, HashMap<String, String>) -> Result<Response, HandlerError>,
+    F: Fn(&Request, HashMap<String, String>) -> R + Send + Sync + 'static,
+    R: IntoResponse,
 {
-    fn handle(
+    fn call(
         &self,
         request: &Request,
         params: HashMap<String, String>,
     ) -> Result<Response, HandlerError> {
-        self(request, params)
+        Ok((self)(request, params).into_response())
     }
 }
 

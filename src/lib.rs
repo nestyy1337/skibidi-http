@@ -48,7 +48,7 @@ pub enum RouterError {
     PathNotFound,
 }
 
-type Route = (&'static str, Box<dyn Handler + Send + Sync>);
+type Route = (&'static str, Box<dyn Handler>);
 type HandlerType = Box<dyn Handler + Send + Sync>;
 
 impl RouterBuilder {

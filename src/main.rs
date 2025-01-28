@@ -23,6 +23,7 @@ async fn main() {
         .route("/", Box::new(simple_handler))
         .route("/user-agent", Box::new(simple_handler))
         .route("/echo/{str}", Box::new(respond_with_body_handler))
+        .route("/empty}", Box::new(test_hander))
         // .route("/files/{filename}", Box::new(respond_with_file))
         .build();
 
@@ -37,7 +38,7 @@ fn simple_handler(
 ) -> Result<Response, HandlerError> {
     println!("triggered handler");
     if let Some(param) = map.values().next() {
-        return Ok(param.into_response());
+        return Ok(param.clone().into_response());
     }
     let step = request.get_header("User-Agent");
     if let Some(header) = step {
@@ -46,29 +47,33 @@ fn simple_handler(
     Ok(().into_response())
 }
 
+fn test_hander(request: &Request, map: HashMap<String, String>) -> impl IntoResponse {
+    ()
+}
+
 fn respond_with_body_handler(
     request: &Request,
     map: HashMap<String, String>,
 ) -> Result<Response, HandlerError> {
     let body = map.get("str");
     match body {
-        Some(bod) => Ok(bod.into_response()),
+        Some(bod) => Ok(bod.clone().into_response()),
         None => Err(HandlerError::MainHandlerError),
     }
 }
 
-// fn respond_with_file(map: HashMap<String, String>) -> impl IntoResponse {
-//     let file_name = map.get("filename").unwrap();
-//     let args = Args::parse();
-//
-//     match args.directory {
-//         Some(path) => {
-//             let file_path = format!("{}{}", path, file_name);
-//             match fs::read(&file_path) {
-//                 Ok(contents) => (StatusCode::ALL_OK, contents), // (StatusCode, Vec<u8>)
-//                 Err(_) => (StatusCode::NOT_FOUND, "pozdro nie ma tu wstepu"), // (StatusCode, &str)
-//             }
-//         }
-//         None => (StatusCode::NOT_FOUND, "cpozdro nie ma tu wstepu"), // (StatusCode, &str)
-//     }
-// }
+fn respond_with_file(map: HashMap<String, String>) -> Response {
+    let file_name = map.get("filename").unwrap();
+    let args = Args::parse();
+
+    match args.directory {
+        Some(path) => {
+            let file_path = format!("{}{}", path, file_name);
+            match fs::read(&file_path) {
+                Ok(contents) => (StatusCode::ALL_OK, contents).into_response(), // (StatusCode, Vec<u8>)
+                Err(_) => (StatusCode::NOT_FOUND, "pozdro nie ma tu wstepu").into_response(), // (StatusCode, &str)
+            }
+        }
+        None => (StatusCode::NOT_FOUND, "cpozdro nie ma tu wstepu").into_response(),
+    }
+}

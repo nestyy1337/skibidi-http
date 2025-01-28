@@ -13,7 +13,7 @@ pub fn handle_connection_blocking(mut stream: TcpStream, service: RouterService)
                     Some(route_match) => {
                         let resp = route_match
                             .handler
-                            .handle(&request, route_match.params)
+                            .call(&request, route_match.params)
                             .unwrap()
                             .to_bytes();
 
@@ -52,7 +52,7 @@ pub async fn handle_connection(mut stream: tokio::net::TcpStream, service: Route
                     Some(route_match) => {
                         let resp = route_match
                             .handler
-                            .handle(&request, route_match.params)
+                            .call(&request, route_match.params)
                             .unwrap()
                             .to_bytes();
 

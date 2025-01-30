@@ -1,26 +1,27 @@
 use skibidi_http::server::handle_connection::StatusCode;
+use skibidi_http::server::router::Router;
+use skibidi_http::server::server::Server;
 use std::collections::HashMap;
 use std::fs;
 use tokio::net::TcpListener;
 
 use skibidi_http::client::client::Request;
 use skibidi_http::into_response::{HandlerError, Response};
-use skibidi_http::{get, HandlerTypes};
-use skibidi_http::{IntoResponse, Router, Server};
+use skibidi_http::{HandlerTypes, IntoResponse};
 
-#[tokio::main(flavor = "multi_thread", worker_threads = 10)]
+#[tokio::main(flavor = "multi_thread", worker_threads = 8)]
 async fn main() {
     let listener = TcpListener::bind("127.0.0.1:4221").await.unwrap();
     let router = Router::builder()
-        //why do i have to suffer through lack of specialization on stable rust
-        // .route("/", HandlerTypes::Full(Box::new(simple_handler)))
-        // .route("/user-agent", HandlerTypes::Full(Box::new(simple_handler)))
-        .route("/echo/{str}", HandlerTypes::full(respond_with_body_handler))
-        // .route("/empty", HandlerTypes::Full(Box::new(test_hander)))
-        // .route(
-        //     "/files/{filename}",
-        //     HandlerTypes::Params(Box::new(respond_with_file)),
-        // )
+        //why do i have to suffer through lack of specialization in stable rust
+        .route("/", HandlerTypes::full(simple_handler))
+        .route("/user-agent", HandlerTypes::full(simple_handler))
+        .route(
+            "/echo/{str}",
+            HandlerTypes::params(respond_with_body_handler),
+        )
+        .route("/empty", HandlerTypes::empty(test_hander))
+        .route("/files/{filename}", HandlerTypes::params(respond_with_file))
         .build();
 
     let service = router.into_service();
@@ -28,12 +29,8 @@ async fn main() {
     server.serve().await.unwrap();
 }
 
-fn simple_handler(
-    request: &Request,
-    map: HashMap<String, String>,
-) -> Result<Response, HandlerError> {
-    println!("triggered handler");
-    if let Some(param) = map.values().next() {
+fn simple_handler(request: Request) -> Result<Response, HandlerError> {
+    if let Some(param) = request.headers.values().next() {
         return Ok(param.clone().into_response());
     }
     let step = request.get_header("User-Agent");
@@ -43,14 +40,11 @@ fn simple_handler(
     Ok(().into_response())
 }
 
-fn test_hander(request: &Request, map: HashMap<String, String>) -> impl IntoResponse {
+fn test_hander() -> impl IntoResponse {
     HandlerError::MainHandlerError
 }
 
-fn respond_with_body_handler(
-    request: &Request,
-    map: HashMap<String, String>,
-) -> Result<Response, HandlerError> {
+fn respond_with_body_handler(map: HashMap<String, String>) -> Result<Response, HandlerError> {
     let body = map.get("str");
     match body {
         Some(bod) => Ok(bod.clone().into_response()),

@@ -33,7 +33,7 @@ pub struct Request {
     method: Method,
     path: String,
     version: String,
-    headers: HashMap<String, String>,
+    pub headers: HashMap<String, String>,
     pub body: Option<Vec<u8>>,
 }
 
@@ -52,7 +52,6 @@ impl Request {
             body: None,
         };
 
-        println!("REQUEST STRUCT: {:?}", req);
         req
     }
 
@@ -61,7 +60,6 @@ impl Request {
     }
 
     pub fn get_header(&self, key: &str) -> Option<&str> {
-        println!("hmap: {:?}", self.headers);
         match self.headers.get(key) {
             Some(val) => Some(val.trim()),
             None => None,

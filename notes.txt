@@ -1,0 +1,23 @@
+1. extractors
+^kinda
+
+2. not require request/params to be passed to handlers which dont care
+^kinda done
+
+5. body handling
+^fine
+
+3. nesting routers
+4. middleware? prob not
+
+
+inbuilt logging
+
+tls support, from scratch
+
+encoding
+zip
+
+
+
+

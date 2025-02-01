@@ -28,6 +28,16 @@ impl FromStr for Method {
     }
 }
 
+impl ToString for Method {
+    fn to_string(&self) -> String {
+        match self {
+            Method::GET => "GET".to_string(),
+            Method::POST => "POST".to_string(),
+            Method::DELETE => "DELETE".to_string(),
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct Request {
     method: Method,
@@ -56,7 +66,12 @@ impl Request {
     }
 
     pub fn get_path(&self) -> &str {
+        println!("path: {:?}", self.path.as_str());
         self.path.as_str()
+    }
+
+    pub fn set_body(&mut self, body: Vec<u8>) {
+        self.body = Some(body)
     }
 
     pub fn get_header(&self, key: &str) -> Option<&str> {
@@ -64,6 +79,10 @@ impl Request {
             Some(val) => Some(val.trim()),
             None => None,
         }
+    }
+
+    pub fn get_method(&self) -> String {
+        self.method.to_string()
     }
 }
 

@@ -14,18 +14,33 @@ pub fn handle_connection_blocking(mut stream: TcpStream, service: RouterService)
             Ok(request) => {
                 match service.router.matches(request.get_path()) {
                     Some(route_match) => {
+                        if request.get_method() == route_match.methods.to_string() {
+                            let method_not_allowed_response =
+                                StatusCode::METHOD_NOT_ALLOWED.into_response().to_bytes();
+
+                            if let Err(e) =
+                                write_blocking(&mut stream, &method_not_allowed_response)
+                            {
+                                eprintln!("ERRORED WITH: {:?}", e);
+                                break;
+                            } else {
+                                break;
+                            }
+                        }
+
                         let resp = match &route_match.handler {
-                            HandlerTypes::ZeroParams(a) => a.call().unwrap().to_bytes(),
-                            HandlerTypes::Params(a) => a.call(request.headers).unwrap().to_bytes(),
-                            HandlerTypes::Body(a) => a.call(request).unwrap().to_bytes(),
-                            HandlerTypes::Full(a) => a.call(request).unwrap().to_bytes(),
+                            HandlerTypes::ZeroParams(a) => a.0.call().unwrap().to_bytes(),
+                            HandlerTypes::Params(a) => {
+                                a.0.call(request.headers).unwrap().to_bytes()
+                            }
+                            HandlerTypes::Body(a) => a.0.call(request).unwrap().to_bytes(),
+                            HandlerTypes::Full(a) => a.0.call(request).unwrap().to_bytes(),
                         };
 
                         // .call(&request, route_match.params)
                         // .unwrap()
                         // .to_bytes();
 
-                        println!("responding: {:?}", String::from_utf8_lossy(&resp));
                         if let Err(e) = write_blocking(&mut stream, &resp) {
                             eprintln!("ERRORED WITH: {:?}", e);
                             break;
@@ -58,19 +73,43 @@ pub async fn handle_connection(mut stream: tokio::net::TcpStream, service: Route
             Ok(request) => {
                 match service.router.matches(request.get_path()) {
                     Some(route_match) => {
-                        let resp = match &route_match.handler {
-                            HandlerTypes::ZeroParams(a) => a.call().unwrap().to_bytes(),
-                            HandlerTypes::Params(a) => a.call(request.headers).unwrap().to_bytes(),
-                            HandlerTypes::Body(a) => a.call(request).unwrap().to_bytes(),
-                            HandlerTypes::Full(a) => a.call(request).unwrap().to_bytes(),
-                            _ => Response::error().into_response().to_bytes(),
-                        };
+                        println!(
+                            "{} : {}",
+                            request.get_method(),
+                            route_match.methods.to_string()
+                        );
+                        println!("path: {:?}", request.get_path());
 
-                        if let Err(e) = write_async(&mut stream, &resp).await {
-                            eprintln!("ERRORED WITH: {:?}", e);
-                            break;
+                        if request.get_method() == route_match.methods.to_string() {
+                            println!("shouldnt go there");
+                            let resp = match &route_match.handler {
+                                HandlerTypes::ZeroParams(a) => a.0.call().unwrap().to_bytes(),
+                                HandlerTypes::Params(a) => {
+                                    a.0.call(request.headers).unwrap().to_bytes()
+                                }
+                                HandlerTypes::Body(a) => a.0.call(request).unwrap().to_bytes(),
+                                HandlerTypes::Full(a) => a.0.call(request).unwrap().to_bytes(),
+                            };
+
+                            if let Err(e) = write_async(&mut stream, &resp).await {
+                                eprintln!("ERRORED WITH: {:?}", e);
+                                break;
+                            } else {
+                                break;
+                            }
                         } else {
-                            break;
+                            println!("should be HERE");
+                            let method_not_allowed_response =
+                                StatusCode::METHOD_NOT_ALLOWED.into_response().to_bytes();
+
+                            if let Err(e) =
+                                write_async(&mut stream, &method_not_allowed_response).await
+                            {
+                                println!("ERRORED WITH: {:?}", e);
+                                break;
+                            } else {
+                                break;
+                            }
                         }
                     }
                     None => {
@@ -100,6 +139,7 @@ pub enum StatusCode {
     BAD_REQUEST,
     UNAUTHORIZED,
     FORBIDDEN,
+    METHOD_NOT_ALLOWED,
 }
 
 impl StatusCode {
@@ -113,6 +153,7 @@ impl StatusCode {
             StatusCode::BAD_REQUEST => "HTTP/1.1 400 Bad Request\r\n\r\n",
             StatusCode::UNAUTHORIZED => "HTTP/1.1 401 Unauthorized\r\n\r\n",
             StatusCode::FORBIDDEN => "HTTP/1.1 403 Forbidden\r\n\r\n",
+            StatusCode::METHOD_NOT_ALLOWED => "HTTP/1.1 405 Method Not Allowed\r\n\r\n",
         }
     }
 }

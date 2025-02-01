@@ -98,13 +98,26 @@ pub async fn parse_http(stream: &mut tokio::net::TcpStream) -> Result<Request, P
                         return Err(ParseError::CloseConn);
                     }
 
+                    let mut request;
+
                     let mut finder = memmem::find_iter(&v, b"\r\n\r\n");
                     if let Some(pos) = finder.nth(0) {
                         let header = parse_header(&v[..pos]);
                         match header {
-                            Ok(head) => return Ok(head),
+                            Ok(head) => request = head,
                             Err(_) => return Err(ParseError::HearderError),
                         };
+
+                        let body_headers = request.get_header("Content-Length");
+                        if let Some(_body) = body_headers {
+                            let body = &v[pos..];
+                            if !body.is_empty() {
+                                request.set_body(body.to_vec());
+                            }
+                        }
+
+                        println!("{:?}", request);
+                        return Ok(request);
                     }
                 }
                 Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {

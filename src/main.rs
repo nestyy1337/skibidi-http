@@ -5,23 +5,27 @@ use std::collections::HashMap;
 use std::fs;
 use tokio::net::TcpListener;
 
-use skibidi_http::client::client::Request;
+use skibidi_http::client::client::{Method, Request};
 use skibidi_http::into_response::{HandlerError, Response};
 use skibidi_http::{HandlerTypes, IntoResponse};
 
+// shit without macros is pain
 #[tokio::main(flavor = "multi_thread", worker_threads = 8)]
 async fn main() {
     let listener = TcpListener::bind("127.0.0.1:4221").await.unwrap();
     let router = Router::builder()
         //why do i have to suffer through lack of specialization in stable rust
-        .route("/", HandlerTypes::full(simple_handler))
-        .route("/user-agent", HandlerTypes::full(simple_handler))
+        .route("/", HandlerTypes::full(simple_handler, Method::GET))
+        .route("/user-agent", HandlerTypes::full(user_agent, Method::GET))
         .route(
             "/echo/{str}",
-            HandlerTypes::params(respond_with_body_handler),
+            HandlerTypes::params(respond_with_body_handler, Method::POST),
         )
-        .route("/empty", HandlerTypes::empty(test_hander))
-        .route("/files/{filename}", HandlerTypes::params(respond_with_file))
+        .route("/empty", HandlerTypes::empty(test_hander, Method::POST))
+        .route(
+            "/files/{filename}",
+            HandlerTypes::params(respond_with_file, Method::POST),
+        )
         .build();
 
     let service = router.into_service();
@@ -33,10 +37,15 @@ fn simple_handler(request: Request) -> Result<Response, HandlerError> {
     if let Some(param) = request.headers.values().next() {
         return Ok(param.clone().into_response());
     }
+    Ok(().into_response())
+}
+
+fn user_agent(request: Request) -> Result<Response, HandlerError> {
     let step = request.get_header("User-Agent");
     if let Some(header) = step {
         return Ok(header.into_response());
     }
+
     Ok(().into_response())
 }
 

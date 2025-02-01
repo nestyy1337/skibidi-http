@@ -173,6 +173,7 @@ impl IntoResponse for StatusCode {
         match self {
             StatusCode::NOT_FOUND => "404 Not Found".into_response(),
             StatusCode::CREATED => "201 Created".into_response(),
+            StatusCode::METHOD_NOT_ALLOWED => "405 Method Not Allowed".into_response(),
             _ => "500 Internal Server Error".into_response(),
         }
     }

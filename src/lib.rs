@@ -1,8 +1,10 @@
 pub mod client;
+use client::client::Method;
 use client::client::Request;
 use into_response::Handler0;
 use into_response::HandlerParams;
 use into_response::HandlerRequest;
+use server::router::MethodTypes;
 use std::io::{self, Write};
 use tokio::io::AsyncWriteExt;
 pub mod into_response;
@@ -13,43 +15,54 @@ use std::collections::HashMap;
 use std::net::TcpListener;
 
 pub enum HandlerTypes {
-    ZeroParams(Box<dyn Handler0 + Send + Sync + 'static>),
-    Full(Box<dyn Handler + Send + Sync + 'static>),
-    Body(Box<dyn HandlerRequest + Send + Sync + 'static>),
-    Params(Box<dyn HandlerParams + Send + Sync + 'static>),
+    ZeroParams((Box<dyn Handler0 + Send + Sync + 'static>, Method)),
+    Full((Box<dyn Handler + Send + Sync + 'static>, Method)),
+    Body((Box<dyn HandlerRequest + Send + Sync + 'static>, Method)),
+    Params((Box<dyn HandlerParams + Send + Sync + 'static>, Method)),
 }
 
 impl HandlerTypes {
-    pub fn full<F, R>(handler: F) -> Self
+    fn get_method(&self) -> &Method {
+        match self {
+            HandlerTypes::ZeroParams((_, method)) => method,
+            HandlerTypes::Full((_, method)) => method,
+            HandlerTypes::Body((_, method)) => method,
+            HandlerTypes::Params((_, method)) => method,
+        }
+    }
+}
+
+impl HandlerTypes {
+    pub fn full<F, R>(handler: F, method: Method) -> Self
     where
         F: Fn(Request) -> R + Send + Sync + 'static,
         R: IntoResponse,
     {
-        HandlerTypes::Full(Box::new(handler))
+        HandlerTypes::Full((Box::new(handler), method))
     }
 
-    pub fn empty<F, R>(handler: F) -> Self
+    pub fn empty<F, R>(handler: F, method: Method) -> Self
     where
         F: Fn() -> R + Send + Sync + 'static,
         R: IntoResponse,
     {
-        HandlerTypes::ZeroParams(Box::new(handler))
+        HandlerTypes::ZeroParams((Box::new(handler), method))
     }
 
-    pub fn body<F, R>(handler: F) -> Self
+    pub fn body<F, R>(handler: F, method: Method) -> Self
     where
         F: Fn(Request) -> R + Send + Sync + 'static,
         R: IntoResponse,
     {
-        HandlerTypes::Body(Box::new(handler))
+        HandlerTypes::Body((Box::new(handler), method))
     }
 
-    pub fn params<F, R>(handler: F) -> Self
+    pub fn params<F, R>(handler: F, method: Method) -> Self
     where
         F: Fn(HashMap<String, String>) -> R + Send + Sync + 'static,
         R: IntoResponse,
     {
-        HandlerTypes::Params(Box::new(handler))
+        HandlerTypes::Params((Box::new(handler), method))
     }
 }
 

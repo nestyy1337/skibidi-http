@@ -2,7 +2,7 @@ use std::{collections::HashMap, sync::Arc};
 
 use thiserror::Error;
 
-use crate::HandlerTypes;
+use crate::{client::client::Method, HandlerTypes};
 
 #[derive(Clone)]
 pub struct RouterService {
@@ -12,7 +12,14 @@ pub struct RouterService {
 pub struct RouteMatch<'a> {
     pub handler: &'a HandlerTypes,
     pub params: HashMap<String, String>,
+    pub methods: &'a Method,
 }
+
+pub enum MethodTypes {
+    GET,
+    POST,
+}
+
 #[derive(Error, Debug)]
 pub enum RouterError {
     #[error("failed to find appropriate route")]
@@ -59,10 +66,12 @@ impl Router {
 
         self.inner.iter().find_map(|(pattern, handler)| {
             let path_pattern = PatternPath::from_path(pattern);
+            println!("pattern: {:?}", path_pattern);
             if path_pattern.matches(&path) {
                 Some(RouteMatch {
                     handler,
                     params: path_pattern.extract_params(&path),
+                    methods: handler.get_method(),
                 })
             } else {
                 None

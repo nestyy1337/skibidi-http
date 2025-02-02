@@ -2,7 +2,7 @@ use std::{collections::HashMap, io::Read, net::TcpStream, str::FromStr};
 
 use thiserror::Error;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Method {
     GET,
     POST,
@@ -66,7 +66,6 @@ impl Request {
     }
 
     pub fn get_path(&self) -> &str {
-        println!("path: {:?}", self.path.as_str());
         self.path.as_str()
     }
 
@@ -81,11 +80,10 @@ impl Request {
         }
     }
 
-    pub fn get_method(&self) -> String {
-        self.method.to_string()
+    pub fn get_method(&self) -> &Method {
+        &self.method
     }
 }
-
 pub trait IntoRequest {
     fn into_request(self) -> Request;
 }

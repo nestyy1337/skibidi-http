@@ -66,16 +66,6 @@ impl HandlerTypes {
     }
 }
 
-pub trait Methodable: Send + Sync + 'static {
-    fn wrap(&self, handler: HandlerTypes) -> Box<HandlerTypes>;
-}
-
-pub fn get(
-    func: impl IntoResponse + Sync + Send + 'static,
-) -> Box<dyn IntoResponse + Sync + Send + 'static> {
-    Box::new(func)
-}
-
 pub enum TcpListeners {
     Blocking(TcpListener),
     Asynchronous(TcpListener),
@@ -118,6 +108,5 @@ async fn write_async<T>(stream: &mut tokio::net::TcpStream, response: T) -> io::
 where
     T: AsRef<[u8]> + Send,
 {
-    println!("response: {:?}", String::from_utf8_lossy(response.as_ref()));
     AsyncResponseWriter::write_response(stream, response).await
 }

@@ -24,6 +24,8 @@ pub enum MethodTypes {
 pub enum RouterError {
     #[error("failed to find appropriate route")]
     PathNotFound,
+    #[error("failed to find appropriate method handler")]
+    MethodNotAllowed,
 }
 pub struct RouterBuilder {
     routes: Vec<(&'static str, HandlerTypes)>,
@@ -61,20 +63,32 @@ impl Router {
 }
 
 impl Router {
-    pub fn matches(&self, path: &str) -> Option<RouteMatch> {
-        // let normalized = normalize_path(path);
-
-        self.inner.iter().find_map(|(pattern, handler)| {
+    pub fn matches(&self, path: &str, required_method: Method) -> Result<RouteMatch, RouterError> {
+        // First, try to find a matching route with the correct path and method.
+        let result = self.inner.iter().find_map(|(pattern, handler)| {
             let path_pattern = PatternPath::from_path(pattern);
-            println!("pattern: {:?}", path_pattern);
-            if path_pattern.matches(&path) {
-                Some(RouteMatch {
-                    handler,
-                    params: path_pattern.extract_params(&path),
-                    methods: handler.get_method(),
-                })
+            if path_pattern.matches(path) {
+                if *handler.get_method() == required_method {
+                    // Found a match with the required method.
+                    return Some(RouteMatch {
+                        handler,
+                        params: path_pattern.extract_params(path),
+                        methods: handler.get_method(),
+                    });
+                }
+            }
+            None
+        });
+
+        result.ok_or_else(|| {
+            if self
+                .inner
+                .iter()
+                .any(|(pattern, _)| PatternPath::from_path(pattern).matches(path))
+            {
+                RouterError::MethodNotAllowed
             } else {
-                None
+                RouterError::PathNotFound
             }
         })
     }
@@ -110,7 +124,6 @@ impl PatternPath {
 
     fn matches(&self, path: &str) -> bool {
         let path_segments: Vec<_> = path.split("/").filter(|s| !s.is_empty()).collect();
-
         if path_segments.len() != self.segments.len() {
             return false;
         }

@@ -1,7 +1,7 @@
 use super::client::{Method, Request};
-use memchr::memmem::{self, FindIter};
+use memchr::memmem::{self};
 use std::collections::HashMap;
-use std::io::{self, BufReader, Read};
+use std::io::{self, Read};
 use tokio::io::Interest;
 
 use std::net::TcpStream;
@@ -28,7 +28,6 @@ pub fn parse_http_blocking(stream: &mut TcpStream) -> Result<Request, ParseError
     loop {
         let mut local = [0; 2024];
         let read = stream.read(&mut local).unwrap();
-        println!("REQ: {:?}", String::from_utf8_lossy(&local[..read]));
         v.extend_from_slice(&local[..read]);
 
         if read == 0 {
@@ -55,7 +54,6 @@ fn parse_header(buf: &[u8]) -> Result<Request, ParseError> {
     let header = String::from_utf8_lossy(&buf);
 
     let request_line = header.lines().nth(0).ok_or(ParseError::HearderError)?;
-    println!("line: {}", request_line);
     let mut parts = request_line.split_whitespace();
 
     let method_str = parts.next().ok_or(ParseError::HearderError)?;
@@ -65,10 +63,8 @@ fn parse_header(buf: &[u8]) -> Result<Request, ParseError> {
 
     let mut hmap = HashMap::new();
     for theader in header.lines().skip(1) {
-        println!("dded: {}", theader);
         let (k, v) = theader.split_once(":").ok_or(ParseError::HearderError)?;
         hmap.insert(k.to_string(), v.to_string());
-        println!("added: {}", theader);
     }
 
     Ok(Request::new(method, &path, &version, hmap))
@@ -86,7 +82,6 @@ pub async fn parse_http(stream: &mut tokio::net::TcpStream) -> Result<Request, P
             let mut local = [0; 2024];
             match stream.try_read(&mut local) {
                 Ok(n) => {
-                    println!("REQ: {:?}", String::from_utf8_lossy(&local[..n]));
                     v.extend_from_slice(&local[..n]);
 
                     if n == 0 {
@@ -116,14 +111,13 @@ pub async fn parse_http(stream: &mut tokio::net::TcpStream) -> Result<Request, P
                             }
                         }
 
-                        println!("{:?}", request);
                         return Ok(request);
                     }
                 }
                 Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
                     continue;
                 }
-                Err(e) => return Err(ParseError::CloseConn),
+                Err(_) => return Err(ParseError::CloseConn),
             }
         }
     }
